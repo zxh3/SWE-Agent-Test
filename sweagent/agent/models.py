@@ -10,6 +10,7 @@ from pathlib import Path
 import together
 from anthropic import AI_PROMPT, HUMAN_PROMPT, Anthropic, AnthropicBedrock
 from groq import Groq
+import google.generativeai as genai
 from openai import AzureOpenAI, BadRequestError, OpenAI
 from simple_parsing.helpers.serialization.serializable import FrozenSerializable, Serializable
 from tenacity import (
@@ -300,7 +301,9 @@ class OpenAIModel(BaseModel):
             history = [entry for entry in history if entry["role"] != "system"]
             return "\n".join([entry["content"] for entry in history])
         # Return history components with just role, content fields
-        return [{k: v for k, v in entry.items() if k in ["role", "content"]} for entry in history]
+        messages = [{k: v for k, v in entry.items() if k in ["role", "content"]} for entry in history]
+        logger.info(f"[KIANA] messages: {messages}")
+        return messages
 
     @retry(
         wait=wait_random_exponential(min=1, max=15),
@@ -405,7 +408,6 @@ class GroqModel(OpenAIModel):
             api_key=keys_config["GROQ_API_KEY"],
         )
 
-
 class AnthropicModel(BaseModel):
     MODELS = {
         "claude-instant": {
@@ -486,6 +488,73 @@ class AnthropicModel(BaseModel):
         """
         return anthropic_query(self, history)
 
+class GeminiModel(BaseModel):
+    MODELS = {
+        "gemini-1.5-flash": {
+            "max_context": 100_000,
+            "cost_per_input_token": 0,
+            "cost_per_output_token": 0,
+        },
+        "gemini-1.5-pro": {
+            "max_context": 100_000,
+            "cost_per_input_token": 0,
+            "cost_per_output_token": 0,
+        },
+    }
+
+    def __init__(self, args: ModelArguments, commands: list[Command]):
+        super().__init__(args, commands)
+        genai.configure(api_key=keys_config["GEMINI_API_KEY"])
+
+    def history_to_messages(
+        self,
+        history: list[dict[str, str]],
+        is_demonstration: bool = False,
+    ) -> str | list[dict[str, str]]:
+        """
+        https://ai.google.dev/api/caching#Content
+        """
+        messages = anthropic_history_to_messages(self, history, is_demonstration)
+
+        if type(messages) == str:
+            return '', [{"role": "user", "parts": messages}]
+
+        gemini_messages = []
+
+        systemInstruction = ''
+
+        for message in messages:
+            if message["role"] == "system":
+                systemInstruction = message["content"]
+            elif message["role"] == "user":
+                gemini_messages.append({"role": "user", "parts": message["content"]})
+            elif message["role"] == "assistant":
+                gemini_messages.append({"role": "model", "parts": message["content"]})
+
+        return systemInstruction, gemini_messages
+
+    @retry(
+        wait=wait_random_exponential(min=1, max=15),
+        reraise=True,
+        stop=stop_after_attempt(_MAX_RETRIES),
+        retry=retry_if_not_exception_type((CostLimitExceededError, RuntimeError)),
+    )
+    def query(self, history: list[dict[str, str]]) -> str:
+        """
+        Query the Gemini API with the given `history` and return the response.
+        """
+        systemInstruction, messages = self.history_to_messages(history)
+
+        model = genai.GenerativeModel("gemini-1.5-pro")
+        
+        chat = model.start_chat(
+            history=messages[:-1]
+        )
+        response = chat.send_message(messages[-1]["parts"])
+
+        logger.info(f"Gemini response text {response.text}")
+            
+        return response.text
 
 class BedrockModel(BaseModel):
     MODELS = {
@@ -1016,6 +1085,8 @@ def get_model(args: ModelArguments, commands: list[Command] | None = None):
         return TogetherModel(args, commands)
     elif args.model_name in GroqModel.SHORTCUTS:
         return GroqModel(args, commands)
+    elif args.model_name.startswith('gemini'):
+        return GeminiModel(args, commands)
     elif args.model_name == "instant_empty_submit":
         return InstantEmptySubmitTestModel(args, commands)
     else:

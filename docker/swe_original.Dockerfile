@@ -47,19 +47,4 @@ RUN pip install -r /root/requirements.txt
 
 WORKDIR /
 
-# React Dependencies
-RUN apt-get update && apt-get install -y curl gnupg2 ca-certificates lsb-release build-essential
-
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-
-RUN apt-get install -y nodejs
-
-RUN echo "Node.js version: $(node -v)"
-
-RUN echo "npm version: $(npm -v)"
-
-RUN npm install --global yarn
-
-RUN echo "Yarn version: $(yarn -v)"
-
 CMD ["/bin/bash"]

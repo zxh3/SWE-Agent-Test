@@ -1,0 +1,36 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+anthropic = {extras = ["bedrock"], version = "*"}
+config = "*"
+datasets = "*"
+docker = ">=7.1.0"
+gymnasium = "*"
+numpy = "*"
+openai = ">=1.0"
+pandas = "*"
+rich = "*"
+"ruamel.yaml" = "*"
+swebench = ">=2.0.0"
+tenacity = "*"
+unidiff = "*"
+simple-parsing = "*"
+together = ">=1.1.0"
+ollama = "*"
+rich-argparse = "*"
+flask = "*"
+flask-cors = "*"
+flask-socketio = "*"
+groq = "*"
+sweagent = {file = ".", editable = true}
+jupyter = "*"
+google-generativeai = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.9"
+python_full_version = "3.9.6"

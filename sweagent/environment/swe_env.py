@@ -1041,6 +1041,7 @@ class SWEEnv(gym.Env):
             output: output from container
         """
         logs = self.communicate(input, timeout_duration=timeout_duration)
+        self.logger.info(f"communicate_with_handling output: {logs}")
         if self.returncode != 0:
             self.logger.error(f"{error_msg}: {logs}")
             self.close()
@@ -1135,6 +1136,7 @@ class SWEEnv(gym.Env):
             location: location of script file 'host' or 'container'
         """
         if location == "host":
+            self.logger.info(f"Running shell script at {script_path}")
             return self._run_shell_script_host(script_path)
         elif location == "container":
             raise NotImplementedError
@@ -1148,6 +1150,7 @@ class SWEEnv(gym.Env):
             raise FileNotFoundError(msg)
         shell_commands = Path(script_path).read_text().splitlines(keepends=True)
         for i, cmd in enumerate(shell_commands):
+            self.logger.info(f"Executing line {i}: {cmd}")
             self.communicate_with_handling(
                 cmd,
                 error_msg=f"Failed to execute line {i}.",
@@ -1203,6 +1206,7 @@ class SWEEnv(gym.Env):
         for hook in self.hooks:
             hook.on_install_env_started()
         install_configs = self._get_install_configs()
+        self.logger.info(f"install_configs: {install_configs}")
         if not install_configs:
             return
         if "shell_script_path" in install_configs:
