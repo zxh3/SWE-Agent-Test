@@ -1,0 +1,1 @@
+When specifying num_games, running with -1 games should gracefully prompt the user to input a valid non-negative integer.
